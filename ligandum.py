@@ -129,7 +129,7 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
             )
     return results
 
-def edit_molecule_list(molecule_list, labels):
+def edit_molecule_list(molecule_list, evidence_lookup, labels):
     # delete molecules with more than one TEV modification
     for molecule in molecule_list[:]:
         num_of_labels = 0
@@ -140,14 +140,14 @@ def edit_molecule_list(molecule_list, labels):
     print('Initially found {0} peptides via MS2 sequencing. Now I\'ll look for nonsequenced partners.'.format(len(molecule_list)))
     
     for molecule in molecule_list[:]:
-        print(molecule)
-        check_pairs(molecule, molecule_list, labels)
+        check_pairs(molecule, molecule_list, evidence_lookup, labels)
     
     print('There are {0} peptides after partner generation.'.format(len(molecule_list)))
+    
     return
 
 # Todo: change in the way that not molecule_list is modified but the evidence file is modified! ;) That's the solution!!! 42!!
-def check_pairs(molecule, molecule_list, labels):
+def check_pairs(molecule, molecule_list, evidence_lookup, labels):
     partner_label_name = ''
     current_label_name = ''
     for label in labels:
@@ -157,10 +157,23 @@ def check_pairs(molecule, molecule_list, labels):
             current_label_name = label['name']
     
     partner_molecule = molecule.replace(current_label_name, partner_label_name)
-     
-    if not partner_molecule in molecule_list:
-        molecule_list.append(partner_molecule)
     
+    if not partner_molecule in molecule_list:
+        # new partner molecule should be added to the molecule list
+        molecule_list.append(partner_molecule)
+        
+        # find molecule in evidence lookup
+        c = pyqms.ChemicalComposition()
+        c.use(molecule)
+        inner_dict = evidence_lookup[c.hill_notation_unimod()][molecule]
+        # modify
+        tmp_dict = {
+            partner_molecule: inner_dict
+        }
+        c.clear()
+        c.use(partner_molecule)
+        evidence_lookup.update({c.hill_notation_unimod(): tmp_dict})
+        c.clear()
     return
 
 
@@ -195,20 +208,14 @@ def main():
     # evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
     out_folder = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16'
     
-    tmp_fixed_labels = {
-        'C' : [
-            {
-                'element_composition' : {'O': 1, 'H': 3, '14N': 1, 'C': 2},
-                'evidence_mod_name': 'Carbamidomethyl'
-            }
-        ]
-    }
+    tmp_fixed_labels = {}
     formatted_fixed_labels, evidence_lookup, molecule_list = pyqms.adaptors.parse_evidence(
         fixed_labels         = tmp_fixed_labels,
         evidence_files       = [ evidence_file ],
         evidence_score_field = 'PEP'
     )
-    edit_molecule_list(molecule_list, labels)
+
+    edit_molecule_list(molecule_list, evidence_lookup, labels)
     
     results = ligandability_quantification(mzml_file, molecule_list, evidence_lookup, formatted_fixed_labels)
     results.write_result_csv(out_folder + '/ligand_quant_res.csv')
