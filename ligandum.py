@@ -85,7 +85,6 @@ def msms_identification(mzml_file, database_file):
 
 def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, formatted_fixed_labels):
     run = pymzml.run.Reader(mzml_file)
-    print(evidence_lookup)
     params = {
         'molecules'        : molecule_list,
         'charges'          : [1, 2, 3, 4, 5],
@@ -99,12 +98,20 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
     results = None
     mzml_file_basename = os.path.basename(mzml_file)
     for spectrum in run:
+        scan_time, unit = spectrum.get('scan time', (None, None ))
+        print(unit)
+        if unit == 'second':
+            time_div_factor = 60.0
+            # convert seconds to minutes...
+        else:
+            time_div_factor = 1
+            
         if spectrum['ms level'] == 1:
             results = lib.match_all(
                 mz_i_list = spectrum.centroidedPeaks,
                 file_name = mzml_file_basename,
                 spec_id   = spectrum['id'],
-                spec_rt   = spectrum['scan time'],
+                spec_rt   = spectrum['scan time'] / time_div_factor,
                 results   = results
             )
     return results
@@ -136,14 +143,9 @@ def check_pairs(molecule, molecule_list, labels):
             current_label_name = label['name']
     
     partner_molecule = molecule.replace(current_label_name, partner_label_name)
-    
+     
     if not partner_molecule in molecule_list:
         molecule_list.append(partner_molecule)
-    
-    return
-
-
-def generate_partner_molecule(molecule, labels, partner_molecule_list):
     
     return
 
@@ -170,11 +172,13 @@ def main():
     
     # MS/MS identification and validation, output is written to file system
     database_file = '/Users/MS/Desktop/special_projects/SMHacker/28092017human.fasta'
-    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_ultrashort.mzML'
+    # mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_ultrashort.mzML'
+    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_short.mzML'
     validated_result = msms_identification(mzml_file, database_file)
     
     # MS isotopic ligandability quantification
-    evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_ultrashort_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
+    # evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_ultrashort_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
+    evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
     out_folder = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16'
     
     tmp_fixed_labels = {
@@ -195,6 +199,40 @@ def main():
     results = ligandability_quantification(mzml_file, molecule_list, evidence_lookup, formatted_fixed_labels)
     results.write_result_csv(out_folder + '/ligand_quant_res.csv')
     
+    # serialize, not really necessary...
+    pickle.dump(
+        results,
+        open(
+            '/Users/MS/Desktop/special_projects/SMHacker/pyQms_results.pkl',
+            'wb'
+        )
+    )
+    
+    # deserialize
+    results_class = pickle.load(
+        open(
+            '/Users/MS/Desktop/special_projects/SMHacker/pyQms_results.pkl',
+            'rb'
+        )
+    )
+    rt_border_tolerance = 5
+
+    quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.xlsx'
+    
+    results_class.write_rt_info_file(
+        output_file         = quant_summary_file,
+        list_of_csvdicts    = None,
+        trivial_name_lookup = None,
+        rt_border_tolerance = rt_border_tolerance,
+        update              = True
+    )
+    
+    results_class.calc_amounts_from_rt_info_file(
+        rt_info_file         = quant_summary_file,
+        rt_border_tolerance  = rt_border_tolerance,
+        calc_amount_function = None
+    )
+
     return
     
 
