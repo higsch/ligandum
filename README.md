@@ -1,2 +1,3 @@
-# ligandum
-Python scripts to assess amino acid ligandability in proteomics datasets.
+# Ligandum
+The Quantum of Ligandability
+
