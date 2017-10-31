@@ -84,7 +84,7 @@ def msms_identification(mzml_file, database_file):
             ['Is decoy', 'equals', 'false']
         ]
     }
-    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_ultrashort_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
+    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
     uc = ursgal.UController(
         params = filter_params
     )
@@ -163,16 +163,16 @@ def check_pairs(molecule, molecule_list, evidence_lookup, labels):
         # find molecule in evidence lookup
         c = pyqms.ChemicalComposition()
         c.use(molecule)
-        inner_dict = evidence_lookup[c.hill_notation_unimod()][molecule]
-        # modify
-        tmp_dict = {
-            partner_molecule: inner_dict
-        }
+        if molecule in evidence_lookup[c.hill_notation_unimod()]:
+            inner_dict = evidence_lookup[c.hill_notation_unimod()][molecule]
+            # modify
+            tmp_dict = {
+                partner_molecule: inner_dict
+            }
+            c.clear()
+            c.use(partner_molecule)
+            evidence_lookup.update({c.hill_notation_unimod(): tmp_dict})
         c.clear()
-        c.use(partner_molecule)
-        evidence_lookup.update({c.hill_notation_unimod(): tmp_dict})
-        c.clear()
-        print(evidence_lookup)
     return
 
 
@@ -235,7 +235,7 @@ def main():
             'rb'
         )
     )
-    rt_border_tolerance = 3
+    rt_border_tolerance = 1
 
     quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.xlsx'
     results_class.write_rt_info_file(
