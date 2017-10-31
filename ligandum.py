@@ -9,11 +9,9 @@ Created by Matthias Stahl at TU Muenchen, 2017
 import ursgal
 import pymzml
 import pyqms
-import sys
 import pickle
 import os
-import pprint
-import random
+from collections import defaultdict as ddict
 
 
 def showStartHello():
@@ -174,6 +172,7 @@ def check_pairs(molecule, molecule_list, evidence_lookup, labels):
         c.use(partner_molecule)
         evidence_lookup.update({c.hill_notation_unimod(): tmp_dict})
         c.clear()
+        print(evidence_lookup)
     return
 
 
@@ -199,13 +198,13 @@ def main():
     
     # MS/MS identification and validation, output is written to file system
     database_file = '/Users/MS/Desktop/special_projects/SMHacker/28092017human.fasta'
-    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_ultrashort.mzML'
-    # mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_short.mzML'
+    # mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_ultrashort.mzML'
+    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_short.mzML'
     validated_result = msms_identification(mzml_file, database_file)
     
     # MS isotopic ligandability quantification
-    evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_ultrashort_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
-    # evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
+    # evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_ultrashort_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
+    evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
     out_folder = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16'
     
     tmp_fixed_labels = {}
@@ -218,7 +217,7 @@ def main():
     edit_molecule_list(molecule_list, evidence_lookup, labels)
     
     results = ligandability_quantification(mzml_file, molecule_list, evidence_lookup, formatted_fixed_labels)
-    results.write_result_csv(out_folder + '/ligand_quant_res.csv')
+
     
     # serialize, not really necessary...
     pickle.dump(
@@ -236,7 +235,7 @@ def main():
             'rb'
         )
     )
-    rt_border_tolerance = 10
+    rt_border_tolerance = 3
 
     quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.xlsx'
     results_class.write_rt_info_file(
@@ -250,11 +249,33 @@ def main():
     results_class.calc_amounts_from_rt_info_file(
         rt_info_file         = quant_summary_file,
         rt_border_tolerance  = rt_border_tolerance,
-        calc_amount_function = None
+        calc_amount_function = calc_auc
     )
-
-    return
     
+    results.write_result_csv(out_folder + '/ligand_quant_res.csv')
+    return
+
+
+def calc_auc(obj_for_calc_amount):
+    return_dict = None
+    if len(obj_for_calc_amount['i']) != 0:
+        maxI          = max(obj_for_calc_amount['i'])
+        index_of_maxI = obj_for_calc_amount['i'].index(maxI)
+        amount_rt     = obj_for_calc_amount['rt'][index_of_maxI]
+        amount_score  = obj_for_calc_amount['scores'][index_of_maxI]
+
+        sumI = 0
+        for i in obj_for_calc_amount['i']:
+            sumI += i
+        
+        return_dict = {
+            'max I in window'         : maxI,
+            'max I in window (rt)'    : amount_rt,
+            'max I in window (score)' : amount_score,
+            'sum I in window'         : sumI
+        }
+    return return_dict
+
 
 if __name__ == '__main__':
     main()
