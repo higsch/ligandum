@@ -11,7 +11,6 @@ import pymzml
 import pyqms
 import pickle
 import os
-from collections import defaultdict as ddict
 
 
 def showStartHello():
@@ -84,7 +83,7 @@ def msms_identification(mzml_file, database_file):
             ['Is decoy', 'equals', 'false']
         ]
     }
-    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
+    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_new_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
     uc = ursgal.UController(
         params = filter_params
     )
@@ -100,7 +99,7 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
     run = pymzml.run.Reader(mzml_file)
     params = {
         'molecules'        : molecule_list,
-        'charges'          : [1, 2, 3],
+        'charges'          : [1, 2, 3, 4],
         'fixed_labels'     : formatted_fixed_labels,
         'verbose'          : True,
         'evidences'        : evidence_lookup
@@ -199,12 +198,12 @@ def main():
     # MS/MS identification and validation, output is written to file system
     database_file = '/Users/MS/Desktop/special_projects/SMHacker/28092017human.fasta'
     # mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_ultrashort.mzML'
-    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_short.mzML'
+    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_new.mzML'
     validated_result = msms_identification(mzml_file, database_file)
     
     # MS isotopic ligandability quantification
     # evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_ultrashort_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
-    evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
+    evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_new_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
     out_folder = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16'
     
     tmp_fixed_labels = {}
@@ -235,7 +234,7 @@ def main():
             'rb'
         )
     )
-    rt_border_tolerance = 1
+    rt_border_tolerance = 3
 
     quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.xlsx'
     results_class.write_rt_info_file(
@@ -258,6 +257,7 @@ def main():
 
 def calc_auc(obj_for_calc_amount):
     return_dict = None
+    print(obj_for_calc_amount)
     if len(obj_for_calc_amount['i']) != 0:
         maxI          = max(obj_for_calc_amount['i'])
         index_of_maxI = obj_for_calc_amount['i'].index(maxI)
