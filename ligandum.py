@@ -11,6 +11,7 @@ import pymzml
 import pyqms
 import pickle
 import os
+import numpy as np
 
 
 def showStartHello():
@@ -92,36 +93,30 @@ def msms_identification(mzml_file, database_file):
         input_file = csv_file_to_filter,
     )
     
-    return validated_result
+    return filtered_csv
 
 
 def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, formatted_fixed_labels):
     run = pymzml.run.Reader(mzml_file)
     params = {
         'molecules'        : molecule_list,
-        'charges'          : [1, 2, 3, 4],
+        'charges'          : [1, 2, 3, 4, 5],
         'fixed_labels'     : formatted_fixed_labels,
         'verbose'          : True,
         'evidences'        : evidence_lookup
     }
     
     lib = pyqms.IsotopologueLibrary( **params )
-      
+    
     results = None
     mzml_file_basename = os.path.basename(mzml_file)
     for spectrum in run:
-        unit = 'second'
-        if unit == 'second':
-            time_div_factor = 60.0
-        else:
-            time_div_factor = 1
-            
         if spectrum['ms level'] == 1:
             results = lib.match_all(
                 mz_i_list = spectrum.centroidedPeaks,
                 file_name = mzml_file_basename,
                 spec_id   = spectrum['id'],
-                spec_rt   = spectrum['scan time'] / time_div_factor,
+                spec_rt   = spectrum['scan time'] / 60,
                 results   = results
             )
     return results
@@ -136,6 +131,7 @@ def edit_molecule_list(molecule_list, evidence_lookup, labels):
             molecule_list.remove(molecule)
     print('Initially found {0} peptides via MS2 sequencing. Now I\'ll look for nonsequenced partners.'.format(len(molecule_list)))
     
+    # now check for missing partners that were not identified via MS2
     for molecule in molecule_list[:]:
         check_pairs(molecule, molecule_list, evidence_lookup, labels)
     
@@ -143,7 +139,7 @@ def edit_molecule_list(molecule_list, evidence_lookup, labels):
     
     return
 
-# Todo: change in the way that not molecule_list is modified but the evidence file is modified! ;) That's the solution!!! 42!!
+
 def check_pairs(molecule, molecule_list, evidence_lookup, labels):
     partner_label_name = ''
     current_label_name = ''
@@ -153,6 +149,7 @@ def check_pairs(molecule, molecule_list, evidence_lookup, labels):
         else:
             current_label_name = label['name']
     
+    # generate partner molecule
     partner_molecule = molecule.replace(current_label_name, partner_label_name)
     
     if not partner_molecule in molecule_list:
@@ -163,15 +160,25 @@ def check_pairs(molecule, molecule_list, evidence_lookup, labels):
         c = pyqms.ChemicalComposition()
         c.use(molecule)
         if molecule in evidence_lookup[c.hill_notation_unimod()]:
-            inner_dict = evidence_lookup[c.hill_notation_unimod()][molecule]
-            # modify
+            trivial_names = evidence_lookup[c.hill_notation_unimod()][molecule]['trivial_names'].copy()
+            trivial_names.extend({'no MS2': True})
+            evidence = evidence_lookup[c.hill_notation_unimod()][molecule]['evidences'].copy()
             tmp_dict = {
-                partner_molecule: inner_dict
+                partner_molecule:
+                {
+                    'evidences': evidence,
+                    'trivial_names': trivial_names
+                }
             }
             c.clear()
             c.use(partner_molecule)
-            evidence_lookup.update({c.hill_notation_unimod(): tmp_dict})
+            evidence_lookup[c.hill_notation_unimod()] = tmp_dict
         c.clear()
+    return
+
+
+def calculate_ligandability_ratios(results):
+    
     return
 
 
@@ -197,18 +204,15 @@ def main():
     
     # MS/MS identification and validation, output is written to file system
     database_file = '/Users/MS/Desktop/special_projects/SMHacker/28092017human.fasta'
-    # mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_ultrashort.mzML'
     mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_new.mzML'
-    validated_result = msms_identification(mzml_file, database_file)
+    filtered_result = msms_identification(mzml_file, database_file)
     
     # MS isotopic ligandability quantification
-    # evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_ultrashort_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
-    evidence_file = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_new_msgfplus_v2016_09_16_pmap_unified_percolator_validated_accepted.csv'
+    evidence_file = filtered_result
     out_folder = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16'
-    
-    tmp_fixed_labels = {}
+
     formatted_fixed_labels, evidence_lookup, molecule_list = pyqms.adaptors.parse_evidence(
-        fixed_labels         = tmp_fixed_labels,
+        fixed_labels         = None,
         evidence_files       = [ evidence_file ],
         evidence_score_field = 'PEP'
     )
@@ -234,9 +238,9 @@ def main():
             'rb'
         )
     )
-    rt_border_tolerance = 3
+    rt_border_tolerance = 1
 
-    quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.xlsx'
+    quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.csv'
     results_class.write_rt_info_file(
         output_file         = quant_summary_file,
         list_of_csvdicts    = None,
@@ -252,12 +256,13 @@ def main():
     )
     
     results.write_result_csv(out_folder + '/ligand_quant_res.csv')
+    
+    calculate_ligandability_ratios(results)
     return
 
 
 def calc_auc(obj_for_calc_amount):
     return_dict = None
-    print(obj_for_calc_amount)
     if len(obj_for_calc_amount['i']) != 0:
         maxI          = max(obj_for_calc_amount['i'])
         index_of_maxI = obj_for_calc_amount['i'].index(maxI)
@@ -267,12 +272,15 @@ def calc_auc(obj_for_calc_amount):
         sumI = 0
         for i in obj_for_calc_amount['i']:
             sumI += i
+            
+        aucI = np.trapz(x = obj_for_calc_amount['rt'], y = obj_for_calc_amount['i'])
         
         return_dict = {
             'max I in window'         : maxI,
             'max I in window (rt)'    : amount_rt,
             'max I in window (score)' : amount_score,
-            'sum I in window'         : sumI
+            'sum I in window'         : sumI,
+            'auc in window'           : aucI
         }
     return return_dict
 
