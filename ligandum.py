@@ -80,7 +80,7 @@ def msms_identification(mzml_file, database_file):
     
     filter_params = {
         'csv_filter_rules': [
-            ['PEP', 'lte', 0.01],
+            ['q-value', 'lte', 0.01],
             ['Is decoy', 'equals', 'false']
         ]
     }
@@ -255,7 +255,7 @@ def main():
         calc_amount_function = calc_auc
     )
     
-    results.write_result_csv(out_folder + '/ligand_quant_res.csv')
+    results.write_result_csv('/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv')
     
     calculate_ligandability_ratios(results)
     return

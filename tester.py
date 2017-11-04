@@ -3,16 +3,16 @@
 
 import pymzml
 import os
+from ratios import Ratios
 from rpy2.robjects.packages import importr
 
 def main():
-    print(os.environ.get("R_HOME"))
-    run = pymzml.run.Reader('/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_new.mzML')
-
-    for spectrum in run:
-        if spectrum['ms level'] == 1:
-            print(spectrum)
-            break
+    quant_summary = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.csv'
+    rt_info_file = '/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv'
+    
+    rs = Ratios(quant_summary, rt_info_file, ['TEV_H', 'TEV_L'])
+    rs.read_and_parse_files()
+    print(rs.keys())
     return
 
 if __name__ == '__main__':
