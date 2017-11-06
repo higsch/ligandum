@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
+from __future__ import division
 import pyqms
 import codecs
 import csv
+import numbers
 from collections import namedtuple
 
 r_key = namedtuple(
@@ -40,7 +42,8 @@ default_body_fields = [
         'auc in window',
         'max I in window',
         'sum I in window',
-        'max I in window (score)'
+        'max I in window (score)',
+        'label_percentiles'
     ]
 
 
@@ -50,11 +53,13 @@ class Ratios(dict):
             self,
             quant_summary_file = None,
             rt_info_file       = None,
+            results_class      = None,
             labels             = None
                 ):
         
         self.quant_summary_file = quant_summary_file
         self.rt_info_file = rt_info_file
+        self.results_class = results_class
         self.labels = labels
         
         self._r_key_class = r_key
@@ -64,6 +69,30 @@ class Ratios(dict):
         self.rt_info_dicts = None
         
         return
+    
+    
+    def calculate_ratios(
+                self,
+                label1,
+                label2,
+                quant_field
+                    ):
+        
+        for key, value in self.items():
+            
+            if label1 not in value.keys():
+                continue
+            if label2 not in value.keys():
+                continue
+            try:
+                yield key, float(value[label1][quant_field])/float(value[label2][quant_field])
+            except TypeError:
+                print('no number!')
+            except ZeroDivisionError:
+                yield key, 'zero division'
+            except ValueError:
+                yield key, 'n.d.'
+    
     
     def add_body(
             self, 
@@ -89,13 +118,18 @@ class Ratios(dict):
             self,
             quant_summary_file = None,
             rt_info_file       = None,
+            results_class      = None,
             labels             = None
                 ):
+        
+        print('Ratios are prepared...')
         
         if quant_summary_file is not None:
             self.quant_summary_file = quant_summary_file
         if rt_info_file is not None:
             self.rt_info_file = rt_info_file
+        if results_class is not None:
+            self.results_class = results_class
         if labels is not None:
             self.labels = labels
         
@@ -105,7 +139,8 @@ class Ratios(dict):
              
         if self.quant_summary_file is not None:
             self.quant_summary_dicts = self._get_dicts_from_file(self.quant_summary_file)
-            
+        
+        # read summary file dict in common data structure
         for line in self.quant_summary_dicts:
             molecule, label, label_position, mods = self._split_molecule(line['molecule'])
             self.add_body(
@@ -114,8 +149,20 @@ class Ratios(dict):
                     info = self._extract_molecule_info(line)
                 )
         
-        #print(self.rt_info_dicts[0])
-        
+        # match results class to quant summary
+        print('Evaluating {0} peptide tuples...'.format(len(self)))
+        for result_key, result_value in self.items():
+            #print(result_key[0])
+            for label_key, label_value in result_value.items():
+                for key, i, entry in self.results_class.extract_results(
+                        molecules         = None,
+                        charges           = [int(result_key[1])],
+                        file_names        = label_value['file_name'],
+                        label_percentiles = None,
+                        formulas          = label_value['formula'],
+                        score_threshold   = None
+                    ):
+                    self[result_key][label_key]['data'].append(entry)
         return
 
 
@@ -166,7 +213,7 @@ class Ratios(dict):
         elif mods[-1:] == ';':
             mods = mods[:-1]
             
-        return molecule[:mod_start-1], label, label_position, mods
+        return molecule[:mod_start], label, label_position, mods
     
     
     def _extract_molecule_info(

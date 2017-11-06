@@ -12,6 +12,7 @@ import pyqms
 import pickle
 import os
 import numpy as np
+from ratios import Ratios
 
 
 def showStartHello():
@@ -100,7 +101,7 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
     run = pymzml.run.Reader(mzml_file)
     params = {
         'molecules'        : molecule_list,
-        'charges'          : [1, 2, 3, 4, 5],
+        'charges'          : [2, 3, 4, 5],
         'fixed_labels'     : formatted_fixed_labels,
         'verbose'          : True,
         'evidences'        : evidence_lookup
@@ -248,7 +249,6 @@ def main():
         rt_border_tolerance = rt_border_tolerance,
         update              = True
     )
-    # Todo: does not work with imputed pair peptides...
     results_class.calc_amounts_from_rt_info_file(
         rt_info_file         = quant_summary_file,
         rt_border_tolerance  = rt_border_tolerance,
@@ -257,7 +257,9 @@ def main():
     
     results.write_result_csv('/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv')
     
-    calculate_ligandability_ratios(results)
+    rs = Ratios(quant_summary_file, '/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv', results, ['TEV_H', 'TEV_L'])
+    rs.read_and_parse_files()
+    
     return
 
 
@@ -272,8 +274,17 @@ def calc_auc(obj_for_calc_amount):
         sumI = 0
         for i in obj_for_calc_amount['i']:
             sumI += i
+        
+        rt = list()
+        i = list()
+        for k, score in enumerate(obj_for_calc_amount['scores']):
+            if score > 0.5:
+                rt.append(obj_for_calc_amount['rt'][k])
+                i.append(obj_for_calc_amount['i'][k])
+                
+                
             
-        aucI = np.trapz(x = obj_for_calc_amount['rt'], y = obj_for_calc_amount['i'])
+        aucI = np.trapz(x = rt, y = i)
         
         return_dict = {
             'max I in window'         : maxI,
