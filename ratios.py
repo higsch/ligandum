@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
-from __future__ import division
 import pyqms
 import codecs
 import csv
-import numbers
 from collections import namedtuple
 
 r_key = namedtuple(
@@ -79,20 +77,34 @@ class Ratios(dict):
                     ):
         
         for key, value in self.items():
+            result = 0.0
             
-            if label1 not in value.keys():
-                continue
-            if label2 not in value.keys():
-                continue
             try:
-                yield key, float(value[label1][quant_field])/float(value[label2][quant_field])
-            except TypeError:
-                print('no number!')
-            except ZeroDivisionError:
-                yield key, 'zero division'
-            except ValueError:
-                yield key, 'n.d.'
-    
+                float1 = float(value[label1][quant_field])
+            except (KeyError, ValueError, TypeError) as e:
+                #print(e)
+                float1 = 0.0
+            
+            try:
+                float2 = float(value[label2][quant_field])
+            except (KeyError, ValueError, TypeError) as e:
+                #print(e)
+                float2 = 0.0
+                
+            try:
+                result = float1/float2
+            except ZeroDivisionError as e:
+                #print(e)
+                result = 20.0
+            except:
+                print('Unknown error in ratio calculation!')
+            
+            #print(float1, float2)
+            if float1 == 0.0 and float2 == 0.0:
+                yield key, 0.0
+                continue
+            
+            yield key, result
     
     def add_body(
             self, 

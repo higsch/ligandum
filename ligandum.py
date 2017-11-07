@@ -101,7 +101,7 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
     run = pymzml.run.Reader(mzml_file)
     params = {
         'molecules'        : molecule_list,
-        'charges'          : [2, 3, 4, 5],
+        'charges'          : [2, 3, 4, 5, 6],
         'fixed_labels'     : formatted_fixed_labels,
         'verbose'          : True,
         'evidences'        : evidence_lookup
@@ -239,7 +239,7 @@ def main():
             'rb'
         )
     )
-    rt_border_tolerance = 1
+    rt_border_tolerance = 10
 
     quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.csv'
     results_class.write_rt_info_file(
@@ -275,16 +275,15 @@ def calc_auc(obj_for_calc_amount):
         for i in obj_for_calc_amount['i']:
             sumI += i
         
-        rt = list()
-        i = list()
-        for k, score in enumerate(obj_for_calc_amount['scores']):
-            if score > 0.5:
-                rt.append(obj_for_calc_amount['rt'][k])
-                i.append(obj_for_calc_amount['i'][k])
-                
-                
-            
-        aucI = np.trapz(x = rt, y = i)
+#         rt = list()
+#         i = list()
+#         for k, score in enumerate(obj_for_calc_amount['scores']):
+#             if score > 0.5:
+#                 rt.append(obj_for_calc_amount['rt'][k])
+#                 i.append(obj_for_calc_amount['i'][k])  
+#         aucI = np.trapz(x = rt, y = i)
+
+        aucI = np.trapz(x = obj_for_calc_amount['rt'], y = obj_for_calc_amount['i'])
         
         return_dict = {
             'max I in window'         : maxI,

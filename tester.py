@@ -20,8 +20,8 @@ def main():
     
     rs = Ratios(quant_summary, rt_info_file, results_class, ['TEV_H', 'TEV_L'])
     rs.read_and_parse_files()
-    gen = rs.calculate_ratios('TEV_H', 'TEV_L', 'auc in window')
-    for key, ratio in gen:
+    gen = rs.calculate_ratios('TEV_H', 'TEV_L', 'max I in window')
+    for key, ratio in sorted(gen):
         print(key[0][:int(key[2])]+'*'+key[0][int(key[2]):], key[1], ratio)
     return
 
