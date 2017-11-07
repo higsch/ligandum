@@ -107,12 +107,20 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
         'evidences'        : evidence_lookup
     }
     
+    pyqms.params['MACHINE_OFFSET_IN_PPM'] = 10.0
+    pyqms.params['REL_MZ_RANGE'] = 1e-05
+    pyqms.params['MINIMUM_NUMBER_OF_MATCHED_ISOTOPOLOGUES'] = 1
+    pyqms.params['REQUIRED_PERCENTILE_PEAK_OVERLAP'] = 0.2
+ 
+    
     lib = pyqms.IsotopologueLibrary( **params )
     
     results = None
     mzml_file_basename = os.path.basename(mzml_file)
+    i = 0
     for spectrum in run:
         if spectrum['ms level'] == 1:
+            i += 1
             results = lib.match_all(
                 mz_i_list = spectrum.centroidedPeaks,
                 file_name = mzml_file_basename,
@@ -120,6 +128,8 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
                 spec_rt   = spectrum['scan time'] / 60,
                 results   = results
             )
+            if i % 200 == 0:
+                print('> Match spectrum', spectrum['id'], end = '\r')
     return results
 
 def edit_molecule_list(molecule_list, evidence_lookup, labels):
