@@ -358,9 +358,11 @@ class Ratios(dict):
             
             curve_dict = {}
             for label_key, label_value in self[key].items():
-                
                 if label_value['has_MS2_id'] == True:
-                    ms2_evidences.update({label_key: label_value['evidences (min)']})
+                    ms2_evidences[label_key] = self._parse_evidences(label_value['evidences (min)'])
+                
+                if len(ms2_evidences) == 0:
+                    continue
                 
                 x = []
                 y = []
@@ -372,15 +374,14 @@ class Ratios(dict):
                         y.append(entry.scaling_factor)
                         s.append(entry.score)
                         
-                if x == []:
+                if len(x) == 0:
                     continue
                 
                 for score in s:
                     c.append(colors[int(round(score*100))])
             
                 if xlimits is None:
-                    if len(x) >= 1:
-                        xlimits = [x[0], x[-1]]
+                    xlimits = [x[0], x[-1]]
                     
                 curve_dict.update({
                         label_key: {
@@ -392,8 +393,7 @@ class Ratios(dict):
                                 'xlimits': xlimits
                             }
                     })
-            
-            # determine overall max_y
+
             max_list = []
             min_xlimits_list = []
             max_xlimits_list = []
@@ -415,9 +415,22 @@ class Ratios(dict):
             min_x_limit = min(min_xlimits_list) - 1
             max_x_limit = max(max_xlimits_list) + 1
             
+            all_evidences = []
+            for evidences in ms2_evidences.values():
+                all_evidences.append(evidences)
+            
+            if len(all_evidences) > 0:
+                min_all_evidences = float(min(all_evidences)[0])
+                max_all_evidences = float(max(all_evidences)[0])
+                    
+                if min_x_limit > min_all_evidences:
+                    min_x_limit = min_all_evidences - 1
+                if max_x_limit < max_all_evidences:
+                    max_x_limit = max_all_evidences + 1
+            
             params = {
-                'pch' : 19,
-                'cex' : 0.7,
+                'pch'  : 19,
+                'cex'  : 0.7,
                 'xlab' : 'Retention Time [min]',
                 'ylab' : 'Relative  Abundance',
                 'xlim' : r.c(min_x_limit, max_x_limit),
@@ -451,11 +464,10 @@ class Ratios(dict):
                 )
                 
                 try:
-                    evidences = self._parse_evidences(ms2_evidences[key])
-                    if len(evidences) > 0:
+                    if len(ms2_evidences[key]) > 0:
                         graphics.points(
-                            robjects.FloatVector(evidences),
-                            robjects.FloatVector([0]*len(evidences)),
+                            robjects.FloatVector(ms2_evidences[key]),
+                            robjects.FloatVector([0]*len(ms2_evidences[key])),
                             col = grdevices.palette()[k],
                             lwd = 0.1,
                             pch = 24

@@ -81,7 +81,7 @@ def msms_identification(mzml_file, database_file):
     
     filter_params = {
         'csv_filter_rules': [
-            ['q-value', 'lte', 0.01],
+            ['q-value', 'lte', 0.05],
             ['Is decoy', 'equals', 'false']
         ]
     }

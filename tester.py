@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 
-import pymzml
-import os
 import pickle
 from ratios import Ratios
-from rpy2.robjects.packages import importr
 
 def main():
     quant_summary = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.csv'
@@ -20,6 +17,7 @@ def main():
     
     rs = Ratios(quant_summary, rt_info_file, results_class, ['TEV_H', 'TEV_L'])
     rs.read_and_parse_files()
+    #print(rs)
     gen = rs.calculate_ratios('TEV_H', 'TEV_L', 'max I in window')
     for key, ratio in sorted(gen):
         print(key[0][:int(key[2])]+'*'+key[0][int(key[2]):], key[1], ratio)
