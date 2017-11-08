@@ -139,7 +139,7 @@ class Ratios(dict):
             labels             = None
                 ):
         
-        print('Ratios are prepared...')
+        print('> Ratios are prepared...')
         
         if quant_summary_file is not None:
             self.quant_summary_file = quant_summary_file
@@ -167,7 +167,7 @@ class Ratios(dict):
                 )
         
         # match results class to quant summary
-        print('Evaluating {0} peptide tuples...'.format(len(self)))
+        print('> Evaluating {0} peptide tuples...'.format(len(self)))
         for result_key, result_value in self.items():
             #print(result_key[0])
             for label_key, label_value in result_value.items():
@@ -361,9 +361,6 @@ class Ratios(dict):
                 if label_value['has_MS2_id'] == True:
                     ms2_evidences[label_key] = self._parse_evidences(label_value['evidences (min)'])
                 
-                if len(ms2_evidences) == 0:
-                    continue
-                
                 x = []
                 y = []
                 s = []
@@ -394,6 +391,9 @@ class Ratios(dict):
                             }
                     })
 
+            if len(ms2_evidences) == 0:
+                continue
+            
             max_list = []
             min_xlimits_list = []
             max_xlimits_list = []
@@ -432,7 +432,7 @@ class Ratios(dict):
                 'pch'  : 19,
                 'cex'  : 0.7,
                 'xlab' : 'Retention Time [min]',
-                'ylab' : 'Relative  Abundance',
+                'ylab' : 'Abundance [a.u.]',
                 'xlim' : r.c(min_x_limit, max_x_limit),
                 'ylim' : r.c(0, max_y * 1.1),
                 'main' : '{0}\n Charge: {1}\n Mods: {2}'.format(key[0][:int(key[2])]+'*'+key[0][int(key[2]):], key[1], key[3]),
@@ -458,27 +458,24 @@ class Ratios(dict):
                 graphics.points(
                     robjects.FloatVector(value['x']),
                     robjects.FloatVector(value['y']),
-                    col = robjects.StrVector(value['c']),
+                    #col = robjects.StrVector(value['c']),
+                    col = grdevices.palette()[k],
                     lwd = 0.1,
                     pch = 19
                 )
                 
-                try:
-                    if len(ms2_evidences[key]) > 0:
-                        graphics.points(
-                            robjects.FloatVector(ms2_evidences[key]),
-                            robjects.FloatVector([0]*len(ms2_evidences[key])),
-                            col = grdevices.palette()[k],
-                            lwd = 0.1,
-                            pch = 24
-                        )
-                except KeyError:
-                    pass
-                
                 k += 1
-                
-            
-            
+            k = 0   
+            for key, value in ms2_evidences.items():
+                if len(ms2_evidences[key]) > 0:
+                    graphics.points(
+                        robjects.FloatVector(ms2_evidences[key]),
+                        robjects.FloatVector([0]*len(ms2_evidences[key])),
+                        col = grdevices.palette()[k],
+                        lwd = 0.1,
+                        pch = 24
+                    )
+                k += 1
             
             grdevices.dev_off()
 
@@ -494,3 +491,16 @@ class Ratios(dict):
             evidences_list.append(evidence[evidence.find('@')+1:])
             
         return evidences_list
+    
+    
+    def get_results_by_sequence(
+            self,
+            sequence
+                ):
+        keys = []
+        for key in self.keys():
+            if key[0] == sequence:
+                keys.append(key)
+                
+        for key in keys:
+            yield key, self[key]
