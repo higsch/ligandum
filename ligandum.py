@@ -42,9 +42,12 @@ def msms_identification(mzml_file, database_file):
     # define parameters
     params = {
         'enzyme': 'trypsin',
-        'frag_mass_tolerance': 0.5,
-        'frag_mass_tolerance_unit': 'da',
+        'frag_mass_tolerance': 600,
+        'frag_mass_tolerance_unit': 'ppm',
         'decoy_generation_mode' : 'reverse_protein',
+        'precursor_mass_tolerance_minus': 50,
+        'precursor_mass_tolerance_plus': 50,
+        'precursor_mass_tolerance_unit': 'ppm',
         'precursor_min_charge' : '2',
         'modifications' : [
             'M,opt,any,Oxidation',

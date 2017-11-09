@@ -6,10 +6,8 @@ import bisect
 import pyqms
 import codecs
 import csv
-import math
 from collections import namedtuple
-from rpy2.robjects.lib.grdevices import grdevices
-from numpy import empty
+
 
 r_key = namedtuple(
     'r_key',
@@ -49,6 +47,13 @@ default_body_fields = [
         'label_percentiles'
     ]
 
+LABELS_KEY = 'labels'
+CURATION_KEY = 'curation'
+CURATION_FIELDS = {
+        'required_matches'    : None,
+        'has_required_matches': None,
+        'curated'             : False
+    }
 
 class Ratios(dict):
     
@@ -86,20 +91,17 @@ class Ratios(dict):
             
             try:
                 float1 = float(value[label1][quant_field])
-            except (KeyError, ValueError, TypeError) as e:
-                #print(e)
+            except (KeyError, ValueError, TypeError):
                 float1 = 0.0
             
             try:
                 float2 = float(value[label2][quant_field])
-            except (KeyError, ValueError, TypeError) as e:
-                #print(e)
+            except (KeyError, ValueError, TypeError):
                 float2 = 0.0
                 
             try:
                 result = float1/float2
-            except ZeroDivisionError as e:
-                #print(e)
+            except ZeroDivisionError:
                 result = 20.0
             except:
                 print('Unknown error in ratio calculation!')
@@ -121,10 +123,11 @@ class Ratios(dict):
         r_key = self._r_key_class(*key)
         
         if r_key in self:
-            if label not in self[r_key]:
-                self[r_key].update({label: info})
+            if label not in self[r_key][LABELS_KEY]:
+                self[r_key][LABELS_KEY].update({label: info})
         else:
-            self[r_key] = {
+            self[r_key] = {}
+            self[r_key][LABELS_KEY] = {
                     label: info
                 }
         
@@ -169,8 +172,7 @@ class Ratios(dict):
         # match results class to quant summary
         print('> Evaluating {0} peptide tuples...'.format(len(self)))
         for result_key, result_value in self.items():
-            #print(result_key[0])
-            for label_key, label_value in result_value.items():
+            for label_key, label_value in result_value[LABELS_KEY].items():
                 for key, i, entry in self.results_class.extract_results(
                         molecules         = None,
                         charges           = [int(result_key[1])],
@@ -179,7 +181,11 @@ class Ratios(dict):
                         formulas          = label_value['formula'],
                         score_threshold   = None
                     ):
-                    self[result_key][label_key]['data'].append(entry)
+                    self[result_key][LABELS_KEY][label_key]['data'].append(entry)
+                self[result_key][LABELS_KEY][label_key]['len_data'] = len(self[result_key][LABELS_KEY][label_key]['data'])
+            
+            self[result_key][CURATION_KEY] = CURATION_FIELDS.copy()
+            
         return
 
 
@@ -330,6 +336,7 @@ class Ratios(dict):
             self,
             key_list,
             file_name,
+            label_colors,
             rt_offset          = None,
             xlimits            = None,
             title              = None,
@@ -353,11 +360,17 @@ class Ratios(dict):
             if key not in self.keys():
                 print('Warning, do not have match results for {0}'.format(key))
                 continue
+
+            if self[key][CURATION_KEY]['curated'] and self[key][CURATION_KEY]['has_required_matches'] == False:
+                continue
+                    
             
             ms2_evidences = {}
             
             curve_dict = {}
-            for label_key, label_value in self[key].items():
+            
+            for label_key, label_value in self[key][LABELS_KEY].items():
+                
                 if label_value['has_MS2_id'] == True:
                     ms2_evidences[label_key] = self._parse_evidences(label_value['evidences (min)'])
                 
@@ -371,7 +384,7 @@ class Ratios(dict):
                         y.append(entry.scaling_factor)
                         s.append(entry.score)
                         
-                if len(x) == 0:
+                if len(x) < 3:
                     continue
                 
                 for score in s:
@@ -445,37 +458,34 @@ class Ratios(dict):
                 **params
             )
             
-            k = 0
             for key, value in curve_dict.items():
                 graphics.lines(
                     robjects.FloatVector(value['x']),
                     robjects.FloatVector(value['y']),
                     type = 'l',
                     lwd = 0.7,
-                    col = grdevices.palette()[k]
+                    col = grdevices.palette()[label_colors[key]]
                 )
                     
                 graphics.points(
                     robjects.FloatVector(value['x']),
                     robjects.FloatVector(value['y']),
                     #col = robjects.StrVector(value['c']),
-                    col = grdevices.palette()[k],
+                    col = grdevices.palette()[label_colors[key]],
                     lwd = 0.1,
                     pch = 19
                 )
-                
-                k += 1
-            k = 0   
+            
+            # Todo: Check if colors fit to labels above
             for key, value in ms2_evidences.items():
                 if len(ms2_evidences[key]) > 0:
                     graphics.points(
                         robjects.FloatVector(ms2_evidences[key]),
                         robjects.FloatVector([0]*len(ms2_evidences[key])),
-                        col = grdevices.palette()[k],
+                        col = grdevices.palette()[label_colors[key]],
                         lwd = 0.1,
                         pch = 24
                     )
-                k += 1
             
             grdevices.dev_off()
 
@@ -495,12 +505,72 @@ class Ratios(dict):
     
     def get_results_by_sequence(
             self,
-            sequence
+            sequence,
+            labels_only = True
                 ):
+        
         keys = []
         for key in self.keys():
             if key[0] == sequence:
-                keys.append(key)
-                
-        for key in keys:
-            yield key, self[key]
+                if labels_only:
+                    yield key, self[key][LABELS_KEY]
+                else:
+                    yield key, self[key]
+    
+    
+    def curate_pairs(
+            self,
+            min_matches   = 3,
+            min_pearson   = 0.8,
+            key_list      = None,
+            force         = True
+                ):
+        
+        if key_list is None:
+            key_list = self.keys()
+        
+        for key in key_list:
+            # Check if curation has already taken place, skip curation if force == False
+            if self[key][CURATION_KEY]['curated'] and force == False:
+                continue
+        
+            # Check number of matches
+            self[key][CURATION_KEY]['required_matches'] = min_matches
+            self[key][CURATION_KEY]['has_required_matches'] = self._has_required_matches(key, min_matches)
+            
+            # Todo: other curation types, e.g. coelution profile and overlap
+        
+            self[key][CURATION_KEY]['curated'] = True
+            
+        return
+    
+    
+    def _has_required_matches(
+            self,
+            key,
+            min_matches
+                ):
+    
+        min_matches_reached = True
+        if len(self[key][LABELS_KEY].keys()) != len(self.labels):
+            min_matches_reached = False
+        else:
+            for value in self[key][LABELS_KEY].values():
+                if value['len_data'] < min_matches:
+                    min_matches_reached = False
+                    break
+    
+        return min_matches_reached
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
