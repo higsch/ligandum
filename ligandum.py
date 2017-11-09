@@ -113,10 +113,12 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
     pyqms.params['MACHINE_OFFSET_IN_PPM'] = 10.0
     pyqms.params['REL_MZ_RANGE'] = 1e-05
     pyqms.params['MINIMUM_NUMBER_OF_MATCHED_ISOTOPOLOGUES'] = 1
-    pyqms.params['REQUIRED_PERCENTILE_PEAK_OVERLAP'] = 0.2
+    pyqms.params['REQUIRED_PERCENTILE_PEAK_OVERLAP'] = 0.5
+    pyqms.params['M_SCORE_THRESHOLD'] = 0.0
+    pyqms.params['MZ_SCORE_PERCENTILE'] = 0.4
  
     
-    lib = pyqms.IsotopologueLibrary( **params )
+    lib = pyqms.IsotopologueLibrary(**params)
     
     results = None
     mzml_file_basename = os.path.basename(mzml_file)
@@ -272,6 +274,16 @@ def main():
     
     rs = Ratios(quant_summary_file, '/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv', results, ['TEV_H', 'TEV_L'])
     rs.read_and_parse_files()
+    rs.curate_pairs()
+    
+    gen = rs.calculate_ratios('TEV_H', 'TEV_L', 'max I in window')
+    i = 0
+    for key, ratio in sorted(gen):
+        rs.plot_pairs([key], '/Users/MS/Desktop/special_projects/SMHacker/plots/plot_{0}_{1}.pdf'.format(key[0], key[1]), {'TEV_H': 0, 'TEV_L': 1})
+        i += 1
+        if i % 20 == 0:
+            print('> Plot tuples:', i, end = '\r')
+    
     
     return
 

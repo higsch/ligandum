@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
 # encoding: utf-8
+"""
+    Ligandum
+    -----
 
+    Python class for ligandability ratio handling
+
+    :license: Apache 2.0, see LICENSE.txt for more details
+
+    Authors:
+
+        * Stahl, M.
+    
+"""
 import sys
 import bisect
 import pyqms
 import codecs
 import csv
+import math
+import climber
 from collections import namedtuple
 
 
@@ -345,9 +359,13 @@ class Ratios(dict):
                 ):
 
         zlimits = [0, 1]
+        zlimits_color_ints = [
+            math.floor(zlimits[0]*100.0),
+            math.ceil(zlimits[-1]*100.0)
+        ]       
         
         if rt_offset is None:
-            rt_offset = 3.0
+            rt_offset = 6.0
         
         colors = []
         
@@ -362,8 +380,7 @@ class Ratios(dict):
                 continue
 
             if self[key][CURATION_KEY]['curated'] and self[key][CURATION_KEY]['has_required_matches'] == False:
-                continue
-                    
+                continue 
             
             ms2_evidences = {}
             
@@ -470,8 +487,8 @@ class Ratios(dict):
                 graphics.points(
                     robjects.FloatVector(value['x']),
                     robjects.FloatVector(value['y']),
-                    #col = robjects.StrVector(value['c']),
-                    col = grdevices.palette()[label_colors[key]],
+                    col = robjects.StrVector(value['c']),
+                    #col = grdevices.palette()[label_colors[key]],
                     lwd = 0.1,
                     pch = 19
                 )
@@ -486,10 +503,34 @@ class Ratios(dict):
                         lwd = 0.1,
                         pch = 24
                     )
+                    
+            graphics = self._insert_mscore_legend_into_r_plot(
+                graphics,
+                colors,
+                zlimits_color_ints
+            )
             
             grdevices.dev_off()
 
         return grdevices
+    
+    def _insert_mscore_legend_into_r_plot(
+            self, 
+            graphics, 
+            colors, 
+            zlimits_color_ints
+                ):
+        
+        graphics.legend(
+            'topright',
+            title = "mScore",
+            legend = r.c(['{0:2.1f}'.format(i / 100.) for i in range(zlimits_color_ints[0],zlimits_color_ints[1]+1, 10)]),
+            fill = robjects.StrVector([ colors[i] for i in range(0, zlimits_color_ints[-1] - zlimits_color_ints[0]+1, 10)]),
+            bty = 'n',
+            xpd = True,
+            cex = 0.7
+        )
+        return graphics
     
     
     def _parse_evidences(self,
