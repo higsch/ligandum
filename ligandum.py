@@ -42,11 +42,11 @@ def msms_identification(mzml_file, database_file):
     # define parameters
     params = {
         'enzyme': 'trypsin',
-        'frag_mass_tolerance': 600,
+        'frag_mass_tolerance': 20,
         'frag_mass_tolerance_unit': 'ppm',
         'decoy_generation_mode' : 'reverse_protein',
-        'precursor_mass_tolerance_minus': 50,
-        'precursor_mass_tolerance_plus': 50,
+        'precursor_mass_tolerance_minus': 20,
+        'precursor_mass_tolerance_plus': 20,
         'precursor_mass_tolerance_unit': 'ppm',
         'precursor_min_charge' : '2',
         'modifications' : [
@@ -79,7 +79,7 @@ def msms_identification(mzml_file, database_file):
     # validate search engine results with percolator (writes output files to file system)
     validated_result = uc.validate(
         input_file = search_result,
-        engine     = 'percolator_2_08',
+        engine     = 'xtandem_vengeance' #'percolator_2_08',
     )
     
     filter_params = {
@@ -88,7 +88,7 @@ def msms_identification(mzml_file, database_file):
             ['Is decoy', 'equals', 'false']
         ]
     }
-    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/170209_SMH_170205_P9_05_new_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
+    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/msgfplus_v2016_09_16/171027_P8_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
     uc = ursgal.UController(
         params = filter_params
     )
@@ -110,8 +110,8 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
         'evidences'        : evidence_lookup
     }
     
-    pyqms.params['MACHINE_OFFSET_IN_PPM'] = 10.0
-    pyqms.params['REL_MZ_RANGE'] = 1e-05
+    pyqms.params['MACHINE_OFFSET_IN_PPM'] = 20.0
+    pyqms.params['REL_MZ_RANGE'] = 2e-05
     pyqms.params['MINIMUM_NUMBER_OF_MATCHED_ISOTOPOLOGUES'] = 1
     pyqms.params['REQUIRED_PERCENTILE_PEAK_OVERLAP'] = 0.5
     pyqms.params['M_SCORE_THRESHOLD'] = 0.0
@@ -205,27 +205,27 @@ def main():
     labels = [
         {
             'name': 'TEV_H',
-            'mass': '470.26338',
-            'composition': {'C': 15, '13C': 5, 'H': 32, 'N': 7, '15N': 1, 'O': 5}
+            'mass': '567.30982',
+            'composition': {'C': 21, '13C': 4, 'H': 39, 'N': 7, '15N': 2, 'O': 6}
         },
         {
             'name': 'TEV_L',
-            'mass': '464.24957',
-            'composition': {'C': 20, 'H': 32, 'N': 8, 'O': 5}
+            'mass': '561.30233',
+            'composition': {'C': 25, 'H': 39, 'N': 9, 'O': 6}
         }
     ]
     
-    for label in labels:
-        new_userdefined_unimod_molecule(label['mass'], label['name'], label['composition'])
+#     for label in labels:
+#         new_userdefined_unimod_molecule(label['mass'], label['name'], label['composition'])
     
     # MS/MS identification and validation, output is written to file system
-    database_file = '/Users/MS/Desktop/special_projects/SMHacker/28092017human.fasta'
-    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/170209_SMH_170205_P9_05_new.mzML'
+    database_file = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/coli.fasta'
+    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/171027_P8.mzML'
     filtered_result = msms_identification(mzml_file, database_file)
     
     # MS isotopic ligandability quantification
     evidence_file = filtered_result
-    out_folder = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16'
+    out_folder = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/msgfplus_v2016_09_16'
 
     formatted_fixed_labels, evidence_lookup, molecule_list = pyqms.adaptors.parse_evidence(
         fixed_labels         = None,
@@ -242,7 +242,7 @@ def main():
     pickle.dump(
         results,
         open(
-            '/Users/MS/Desktop/special_projects/SMHacker/pyQms_results.pkl',
+            '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/pyQms_results.pkl',
             'wb'
         )
     )
@@ -250,13 +250,13 @@ def main():
     # deserialize
     results_class = pickle.load(
         open(
-            '/Users/MS/Desktop/special_projects/SMHacker/pyQms_results.pkl',
+            '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/pyQms_results.pkl',
             'rb'
         )
     )
     rt_border_tolerance = 10
 
-    quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.csv'
+    quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/quant_summary.csv'
     results_class.write_rt_info_file(
         output_file         = quant_summary_file,
         list_of_csvdicts    = None,
@@ -270,16 +270,16 @@ def main():
         calc_amount_function = calc_auc
     )
     
-    results.write_result_csv('/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv')
+    results.write_result_csv('/Users/MS/Desktop/special_projects/SMHacker/new_TEV/ligand_quant_res.csv')
     
-    rs = Ratios(quant_summary_file, '/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv', results, ['TEV_H', 'TEV_L'])
+    rs = Ratios(quant_summary_file, '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/ligand_quant_res.csv', results, ['TEV_H', 'TEV_L'])
     rs.read_and_parse_files()
     rs.curate_pairs()
     
     gen = rs.calculate_ratios('TEV_H', 'TEV_L', 'max I in window')
     i = 0
     for key, ratio in sorted(gen):
-        rs.plot_pairs([key], '/Users/MS/Desktop/special_projects/SMHacker/plots/plot_{0}_{1}.pdf'.format(key[0], key[1]), {'TEV_H': 0, 'TEV_L': 1})
+        rs.plot_pairs([key], '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/plots/plot_{0}_{1}.pdf'.format(key[0], key[1]), {'TEV_H': 0, 'TEV_L': 1})
         i += 1
         if i % 20 == 0:
             print('> Plot tuples:', i, end = '\r')

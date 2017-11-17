@@ -19,7 +19,7 @@ import pyqms
 import codecs
 import csv
 import math
-import climber
+#import climber
 from collections import namedtuple
 
 
