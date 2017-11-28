@@ -13,6 +13,7 @@ import pickle
 import os
 import numpy as np
 from ratios import Ratios
+from locale import *
 
 
 def showStartHello():
@@ -43,17 +44,19 @@ def msms_identification(mzml_file, database_file):
     params = {
         'enzyme': 'trypsin',
         'frag_mass_tolerance': 20,
+        'frag_method': 'hcd',
         'frag_mass_tolerance_unit': 'ppm',
+        'max_missed_cleavages': 2,
         'decoy_generation_mode' : 'reverse_protein',
-        'precursor_mass_tolerance_minus': 20,
-        'precursor_mass_tolerance_plus': 20,
+        'precursor_mass_tolerance_minus': 10,
+        'precursor_mass_tolerance_plus': 10,
         'precursor_mass_tolerance_unit': 'ppm',
         'precursor_min_charge' : '2',
         'modifications' : [
             'M,opt,any,Oxidation',
             'C,fix,any,Carbamidomethyl',
-            'K,opt,any,TEV_H',
-            'K,opt,any,TEV_L'
+            'K,opt,any,TEV_H,C(21)13C(4)H(39)N(7)15N(2)O(6)',
+            'K,opt,any,TEV_L,C(25)H(39)N(9)O(6)'
         ],
     }
     
@@ -79,16 +82,16 @@ def msms_identification(mzml_file, database_file):
     # validate search engine results with percolator (writes output files to file system)
     validated_result = uc.validate(
         input_file = search_result,
-        engine     = 'xtandem_vengeance' #'percolator_2_08',
+        engine     = 'percolator_2_08',
     )
     
     filter_params = {
         'csv_filter_rules': [
-            ['q-value', 'lte', 0.05],
+            ['q-value', 'lte', 0.000000001],
             ['Is decoy', 'equals', 'false']
         ]
     }
-    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/msgfplus_v2016_09_16/171027_P8_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
+    csv_file_to_filter = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16/171027_P8_short_msgfplus_v2016_09_16_pmap_unified_percolator_validated.csv'
     uc = ursgal.UController(
         params = filter_params
     )
@@ -101,19 +104,20 @@ def msms_identification(mzml_file, database_file):
 
 
 def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, formatted_fixed_labels):
-    run = pymzml.run.Reader(mzml_file)
+    run = pymzml.run.Reader(mzml_file, extraAccessions = [('MS:1000016', ['value', 'unitName'])])
+    
     params = {
         'molecules'        : molecule_list,
-        'charges'          : [2, 3, 4, 5, 6],
+        'charges'          : [2, 3, 4],
         'fixed_labels'     : formatted_fixed_labels,
         'verbose'          : True,
         'evidences'        : evidence_lookup
     }
     
-    pyqms.params['MACHINE_OFFSET_IN_PPM'] = 20.0
-    pyqms.params['REL_MZ_RANGE'] = 2e-05
-    pyqms.params['MINIMUM_NUMBER_OF_MATCHED_ISOTOPOLOGUES'] = 1
-    pyqms.params['REQUIRED_PERCENTILE_PEAK_OVERLAP'] = 0.5
+    pyqms.params['MACHINE_OFFSET_IN_PPM'] = 10.0
+    pyqms.params['REL_MZ_RANGE'] = 1e-05
+    pyqms.params['MINIMUM_NUMBER_OF_MATCHED_ISOTOPOLOGUES'] = 2
+    pyqms.params['REQUIRED_PERCENTILE_PEAK_OVERLAP'] = 0.7
     pyqms.params['M_SCORE_THRESHOLD'] = 0.0
     pyqms.params['MZ_SCORE_PERCENTILE'] = 0.4
  
@@ -126,11 +130,16 @@ def ligandability_quantification(mzml_file, molecule_list, evidence_lookup, form
     for spectrum in run:
         if spectrum['ms level'] == 1:
             i += 1
+            spec_rt, spec_rt_unit = spectrum['MS:1000016']
+            if spec_rt_unit == 'second':
+                spec_time = spec_rt / 60
+            else:
+                spec_time = spec_rt
             results = lib.match_all(
                 mz_i_list = spectrum.centroidedPeaks,
                 file_name = mzml_file_basename,
                 spec_id   = spectrum['id'],
-                spec_rt   = spectrum['scan time'] / 60,
+                spec_rt   = spec_time,
                 results   = results
             )
             if i % 200 == 0:
@@ -219,19 +228,19 @@ def main():
 #         new_userdefined_unimod_molecule(label['mass'], label['name'], label['composition'])
     
     # MS/MS identification and validation, output is written to file system
-    database_file = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/coli.fasta'
-    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/171027_P8.mzML'
+    database_file = '/Users/MS/Desktop/special_projects/SMHacker/coli.fasta'
+    mzml_file = '/Users/MS/Desktop/special_projects/SMHacker/171027_P8_short.mzML'
     filtered_result = msms_identification(mzml_file, database_file)
     
     # MS isotopic ligandability quantification
     evidence_file = filtered_result
-    out_folder = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/msgfplus_v2016_09_16'
+    out_folder = '/Users/MS/Desktop/special_projects/SMHacker/msgfplus_v2016_09_16'
 
     formatted_fixed_labels, evidence_lookup, molecule_list = pyqms.adaptors.parse_evidence(
         fixed_labels         = None,
         evidence_files       = [ evidence_file ],
         evidence_score_field = 'PEP'
-    )
+    )   
 
     edit_molecule_list(molecule_list, evidence_lookup, labels)
     
@@ -239,51 +248,36 @@ def main():
 
     
     # serialize, not really necessary...
-    pickle.dump(
-        results,
-        open(
-            '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/pyQms_results.pkl',
-            'wb'
-        )
-    )
-    
-    # deserialize
-    results_class = pickle.load(
-        open(
-            '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/pyQms_results.pkl',
-            'rb'
-        )
-    )
+    results
     rt_border_tolerance = 10
 
-    quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/quant_summary.csv'
-    results_class.write_rt_info_file(
+    quant_summary_file  = '/Users/MS/Desktop/special_projects/SMHacker/quant_summary.csv'
+    results.write_rt_info_file(
         output_file         = quant_summary_file,
         list_of_csvdicts    = None,
         trivial_name_lookup = None,
         rt_border_tolerance = rt_border_tolerance,
         update              = True
     )
-    results_class.calc_amounts_from_rt_info_file(
+    results.calc_amounts_from_rt_info_file(
         rt_info_file         = quant_summary_file,
         rt_border_tolerance  = rt_border_tolerance,
         calc_amount_function = calc_auc
     )
     
-    results.write_result_csv('/Users/MS/Desktop/special_projects/SMHacker/new_TEV/ligand_quant_res.csv')
+    results.write_result_csv('/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv')
     
-    rs = Ratios(quant_summary_file, '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/ligand_quant_res.csv', results, ['TEV_H', 'TEV_L'])
+    rs = Ratios(quant_summary_file, '/Users/MS/Desktop/special_projects/SMHacker/ligand_quant_res.csv', results, ['TEV_H', 'TEV_L'])
     rs.read_and_parse_files()
     rs.curate_pairs()
     
     gen = rs.calculate_ratios('TEV_H', 'TEV_L', 'max I in window')
     i = 0
     for key, ratio in sorted(gen):
-        rs.plot_pairs([key], '/Users/MS/Desktop/special_projects/SMHacker/new_TEV/plots/plot_{0}_{1}.pdf'.format(key[0], key[1]), {'TEV_H': 0, 'TEV_L': 1})
+        rs.plot_pairs([key], '/Users/MS/Desktop/special_projects/SMHacker/plots/plot_{0}_{1}.pdf'.format(key[0], key[1]), {'TEV_H': 0, 'TEV_L': 1})
         i += 1
         if i % 20 == 0:
             print('> Plot tuples:', i, end = '\r')
-    
     
     return
 
